@@ -33,14 +33,14 @@ public final class ErrorReporter {
     private final Supplier<String> versionSupplier;
     private Predicate<JsonObject> preSend;
 
-    public static void main(String[] args) {
-        new ErrorReporter("", "", () -> "No version").sendError(new IOException(), false);
-    }
-
     public ErrorReporter(@NotNull String user, @NotNull String repo, @NotNull Supplier<String> versionSupplier) {
         this.user = user;
         this.repo = repo;
         this.versionSupplier = versionSupplier;
+    }
+
+    public static void main(String[] args) {
+        new ErrorReporter("", "", () -> "No version").sendError(new IOException(), false);
     }
 
     @SuppressWarnings("unchecked")
@@ -52,13 +52,14 @@ public final class ErrorReporter {
         try {
             HttpURLConnection connection = (HttpURLConnection) URL.openConnection();
             JsonObject object = new JsonObject();
-            object.add("Version", new JsonPrimitive(versionSupplier.get()));
+            String version = versionSupplier.get();
+            object.add("Version", new JsonPrimitive(version));
             try (StringWriter writer = new StringWriter();
                  PrintWriter printWriter = new PrintWriter(writer)) {
                 throwable.printStackTrace(printWriter);
                 String asString = writer.toString();
                 object.add("Error", new JsonPrimitive("```\n" + asString + "\n```"));
-                object.add("Hashcode", new JsonPrimitive(Integer.toHexString(asString.hashCode())));
+                object.add("Hashcode", new JsonPrimitive(Integer.toHexString(asString.hashCode()) + '-' + Integer.toHexString(version.hashCode())));
             }
             if (preSend != null && preSend.test(object)) {
                 if (rethrow) {
