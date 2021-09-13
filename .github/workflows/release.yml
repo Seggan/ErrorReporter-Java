@@ -64,5 +64,5 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           tag_name: ${{ steps.run.outputs.new-version }}
-          release_name: Release v${{ steps.run.outputs.new-version }}
+          release_name: ErrorReporter-Java v${{ steps.run.outputs.new-version }}
           body: ${{ steps.run.outputs.changelog }}
