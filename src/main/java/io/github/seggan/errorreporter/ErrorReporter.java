@@ -114,7 +114,7 @@ public final class ErrorReporter {
      *
      * @param throwable the {@link Throwable to report}
      */
-    public void sendError(@NotNull Throwable throwable) {
+    public void sendError(@NotNull Throwable throwable) throws ReportException {
         sendError(throwable, true);
     }
 
