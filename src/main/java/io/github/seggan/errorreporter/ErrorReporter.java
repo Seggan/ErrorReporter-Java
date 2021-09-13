@@ -48,7 +48,14 @@ public final class ErrorReporter {
         throw (E) e;
     }
 
-    public void sendError(@NotNull Throwable throwable, boolean rethrow) {
+    /**
+     * Reports the {@link Throwable} given and optionally retrhows the {@link Throwable}
+     *
+     * @param throwable the {@link Throwable} to report
+     * @param rethrow whether the method should rethrow the {@link Throwable}
+     * @throws ReportException if the report failed
+     */
+    public void sendError(@NotNull Throwable throwable, boolean rethrow) throws ReportException {
         try {
             HttpURLConnection connection = (HttpURLConnection) URL.openConnection();
             JsonObject object = new JsonObject();
@@ -89,10 +96,12 @@ public final class ErrorReporter {
                     throw new ReportException("Repository has issues disabled");
                 case 503:
                     throw new ReportException("GitHub service down");
+                case 400:
+                    throw new ReportException("Bad request; maybe using wrong API version?");
             }
             connection.disconnect();
         } catch (IOException e) {
-            sneakyThrow(e);
+            throw new ReportException(e);
         }
 
         if (rethrow) {
@@ -100,8 +109,36 @@ public final class ErrorReporter {
         }
     }
 
+    /**
+     * Reports the {@link Throwable} and rethrows it
+     *
+     * @param throwable the {@link Throwable to report}
+     */
     public void sendError(@NotNull Throwable throwable) {
         sendError(throwable, true);
+    }
+
+    /**
+     * Executes the given code, or else reports the thrown {@link Exception}
+     *
+     * @param runnable the {@link ThrowingRunnable} to run
+     * @param rethrow whether the method should rethrow the {@link Exception} thrown, if any
+     */
+    public void executeOrElseReport(@NotNull ThrowingRunnable runnable, boolean rethrow) {
+        try {
+            runnable.run();
+        } catch (Exception e) {
+            sendError(e, rethrow);
+        }
+    }
+
+    /**
+     * Executes the given code, or else reports the thrown {@link Exception} and retrhows it
+     *
+     * @param runnable the {@link ThrowingRunnable} to run
+     */
+    public void executeOrElseReport(@NotNull ThrowingRunnable runnable) {
+        executeOrElseReport(runnable, true);
     }
 
     /**
