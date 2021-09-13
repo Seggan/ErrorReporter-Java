@@ -32,15 +32,12 @@ public final class ErrorReporter {
     private final String repo;
     private final Supplier<String> versionSupplier;
     private Predicate<JsonObject> preSend;
+    private boolean on = true;
 
     public ErrorReporter(@NotNull String user, @NotNull String repo, @NotNull Supplier<String> versionSupplier) {
         this.user = user;
         this.repo = repo;
         this.versionSupplier = versionSupplier;
-    }
-
-    public static void main(String[] args) {
-        new ErrorReporter("", "", () -> "No version").sendError(new IOException(), false);
     }
 
     @SuppressWarnings("unchecked")
@@ -56,52 +53,54 @@ public final class ErrorReporter {
      * @throws ReportException if the report failed
      */
     public void sendError(@NotNull Throwable throwable, boolean rethrow) throws ReportException {
-        try {
-            HttpURLConnection connection = (HttpURLConnection) URL.openConnection();
-            JsonObject object = new JsonObject();
-            String version = versionSupplier.get();
-            object.add("Version", new JsonPrimitive(version));
-            try (StringWriter writer = new StringWriter();
-                 PrintWriter printWriter = new PrintWriter(writer)) {
-                throwable.printStackTrace(printWriter);
-                String asString = writer.toString();
-                object.add("Error", new JsonPrimitive("```\n" + asString + "\n```"));
-                object.add("Hashcode", new JsonPrimitive(Integer.toHexString(asString.hashCode()) + '-' + Integer.toHexString(version.hashCode())));
-            }
-            if (preSend != null && preSend.test(object)) {
-                if (rethrow) {
-                    sneakyThrow(throwable);
+        if (on) {
+            try {
+                HttpURLConnection connection = (HttpURLConnection) URL.openConnection();
+                JsonObject object = new JsonObject();
+                String version = versionSupplier.get();
+                object.add("Version", new JsonPrimitive(version));
+                try (StringWriter writer = new StringWriter();
+                     PrintWriter printWriter = new PrintWriter(writer)) {
+                    throwable.printStackTrace(printWriter);
+                    String asString = writer.toString();
+                    object.add("Error", new JsonPrimitive("```\n" + asString + "\n```"));
+                    object.add("Hashcode", new JsonPrimitive(Integer.toHexString(asString.hashCode()) + '-' + Integer.toHexString(version.hashCode())));
                 }
-                return;
+                if (preSend != null && preSend.test(object)) {
+                    if (rethrow) {
+                        sneakyThrow(throwable);
+                    }
+                    return;
+                }
+                String s = object.toString();
+                connection.setDoOutput(true);
+                connection.setRequestMethod("POST");
+                connection.setRequestProperty("Content-Type", "application/json");
+                connection.setRequestProperty("Content-Length", Integer.toString(s.length()));
+                connection.setRequestProperty("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/42.0.2311.135 Safari/537.36 Edge/12.246");
+                connection.setRequestProperty("User", user);
+                connection.setRequestProperty("Repo", repo);
+                connection.setRequestProperty("Version", "1");
+                connection.getOutputStream().write(s.getBytes(StandardCharsets.UTF_8));
+                connection.getOutputStream().flush();
+                connection.connect();
+                int code = connection.getResponseCode();
+                switch (code) {
+                    case 500:
+                        throw new ReportException("Server error");
+                    case 404:
+                        throw new ReportException("User/Repository not found");
+                    case 410:
+                        throw new ReportException("Repository has issues disabled");
+                    case 503:
+                        throw new ReportException("GitHub service down");
+                    case 400:
+                        throw new ReportException("Bad request; maybe using wrong API version?");
+                }
+                connection.disconnect();
+            } catch (IOException e) {
+                throw new ReportException(e);
             }
-            String s = object.toString();
-            connection.setDoOutput(true);
-            connection.setRequestMethod("POST");
-            connection.setRequestProperty("Content-Type", "application/json");
-            connection.setRequestProperty("Content-Length", Integer.toString(s.length()));
-            connection.setRequestProperty("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/42.0.2311.135 Safari/537.36 Edge/12.246");
-            connection.setRequestProperty("User", user);
-            connection.setRequestProperty("Repo", repo);
-            connection.setRequestProperty("Version", "1");
-            connection.getOutputStream().write(s.getBytes(StandardCharsets.UTF_8));
-            connection.getOutputStream().flush();
-            connection.connect();
-            int code = connection.getResponseCode();
-            switch (code) {
-                case 500:
-                    throw new ReportException("Server error");
-                case 404:
-                    throw new ReportException("User/Repository not found");
-                case 410:
-                    throw new ReportException("Repository has issues disabled");
-                case 503:
-                    throw new ReportException("GitHub service down");
-                case 400:
-                    throw new ReportException("Bad request; maybe using wrong API version?");
-            }
-            connection.disconnect();
-        } catch (IOException e) {
-            throw new ReportException(e);
         }
 
         if (rethrow) {
@@ -151,5 +150,21 @@ public final class ErrorReporter {
     public ErrorReporter preSend(@Nullable Predicate<JsonObject> preSend) {
         this.preSend = preSend;
         return this;
+    }
+
+    /**
+     * Gets if the reporter is on. If it is off, errors will not be reported
+     *
+     * @return if the reporter is on
+     */
+    public boolean isOn() {
+        return on;
+    }
+
+    /**
+     * Turns the reporter on/off
+     */
+    public void setOn(boolean on) {
+        this.on = on;
     }
 }
