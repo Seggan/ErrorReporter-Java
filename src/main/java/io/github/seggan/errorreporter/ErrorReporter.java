@@ -65,13 +65,13 @@ public final class ErrorReporter {
             try {
                 HttpURLConnection connection = (HttpURLConnection) URL.openConnection();
                 JsonObject object = new JsonObject();
-                object.add("Version", new JsonPrimitive(version));
+                object.addProperty("Version", version);
                 try (StringWriter writer = new StringWriter();
                      PrintWriter printWriter = new PrintWriter(writer)) {
                     throwable.printStackTrace(printWriter);
                     String asString = writer.toString();
-                    object.add("Error", new JsonPrimitive("```\n" + asString + "\n```"));
-                    object.add("Hashcode", new JsonPrimitive(Integer.toHexString(asString.hashCode()) + '-' + Integer.toHexString(version.hashCode())));
+                    object.addProperty("Error", "```\n" + asString + "\n```");
+                    object.addProperty("Hashcode", Integer.toHexString(asString.hashCode()) + '-' + Integer.toHexString(version.hashCode()));
                 }
                 if (preSend != null && preSend.test(object)) {
                     if (rethrow) {
