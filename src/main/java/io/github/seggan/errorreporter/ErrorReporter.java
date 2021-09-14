@@ -30,14 +30,22 @@ public final class ErrorReporter {
 
     private final String user;
     private final String repo;
-    private final Supplier<String> versionSupplier;
+    private final String version;
     private Predicate<JsonObject> preSend;
     private boolean on = true;
 
     public ErrorReporter(@NotNull String user, @NotNull String repo, @NotNull Supplier<String> versionSupplier) {
+        this(user, repo, versionSupplier.get());
+    }
+
+    public ErrorReporter(@NotNull String user, @NotNull String repo, @NotNull String version) {
         this.user = user;
         this.repo = repo;
-        this.versionSupplier = versionSupplier;
+        this.version = version;
+    }
+
+    public static void main(String[] args) {
+        new ErrorReporter("SegganBot", "Test", () -> "No version").sendError(new IOException(), false);
     }
 
     @SuppressWarnings("unchecked")
@@ -57,7 +65,6 @@ public final class ErrorReporter {
             try {
                 HttpURLConnection connection = (HttpURLConnection) URL.openConnection();
                 JsonObject object = new JsonObject();
-                String version = versionSupplier.get();
                 object.add("Version", new JsonPrimitive(version));
                 try (StringWriter writer = new StringWriter();
                      PrintWriter printWriter = new PrintWriter(writer)) {
@@ -77,7 +84,7 @@ public final class ErrorReporter {
                 connection.setRequestMethod("POST");
                 connection.setRequestProperty("Content-Type", "application/json");
                 connection.setRequestProperty("Content-Length", Integer.toString(s.length()));
-                connection.setRequestProperty("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/42.0.2311.135 Safari/537.36 Edge/12.246");
+                connection.setRequestProperty("User-Agent", "Mozilla/5.0 ErrorReporter (github.com/Seggan/ErrorReporter-Java)");
                 connection.setRequestProperty("User", user);
                 connection.setRequestProperty("Repo", repo);
                 connection.setRequestProperty("Version", "1");
